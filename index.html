@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tensegrity — Floating Compression</title>
+<meta name="description" content="An interactive tensegrity workbench: import any 3D object (FBX), place attachment points, string tension-only cables, and let the structure find its form.">
+<meta property="og:title" content="Tensegrity — Floating Compression">
+<meta property="og:description" content="An interactive tensegrity workbench. Struts in compression, cables in tension.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://adpchrgruber.github.io/adp_adv_tensegrity_lab/">
+<meta property="og:image" content="https://adpchrgruber.github.io/adp_adv_tensegrity_lab/docs/preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 26 26 6M6 6l20 20' stroke='%23000' stroke-width='4'/%3E%3Cpath d='M6 6h20v20H6z' fill='none' stroke='%23002FA7' stroke-width='1.5'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --paper:#FFFFFF; --ink:#000000; --muted:#707070; --line:#E3E3E3; --blue:#002FA7;
+    --sans:"Helvetica Neue",Helvetica,Arial,"Liberation Sans",sans-serif;
+    --side:292px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%; overflow:hidden; background:var(--paper); color:var(--ink);
+    font-family:var(--sans); font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;}
+  button,select{font-family:var(--sans); cursor:pointer;}
+  :focus-visible{outline:2px solid var(--blue); outline-offset:2px;}
+
+  #stage{position:fixed; top:0; right:0; bottom:0; left:var(--side);}
+  #canvas-wrap{position:absolute; inset:0;}
+  canvas{display:block; touch-action:none;}
+
+  #ui{
+    position:fixed; top:0; left:0; bottom:0; width:var(--side);
+    background:var(--paper); border-right:1px solid var(--line);
+    display:flex; flex-direction:column; z-index:10;
+  }
+  #ui header{padding:26px 22px 18px; border-bottom:1px solid var(--line); position:relative;}
+  .eyebrow{font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--muted);}
+  .eyebrow .blue{color:var(--blue);}
+  #ui h1{font-weight:700; font-size:27px; line-height:.98; letter-spacing:-.03em; margin:12px 0 8px;}
+  #ui .subtitle{font-size:12px; color:var(--muted); letter-spacing:-.01em;}
+  #ui #btn-sheet{display:none;}
+
+  #panels{flex:1; overflow-y:auto; padding:2px 22px 30px; scrollbar-width:none;}
+  #panels::-webkit-scrollbar{width:0;}
+  .section{padding:20px 0 14px; border-bottom:1px solid var(--line);}
+  .section:last-child{border-bottom:none;}
+  .section > h2{
+    font-size:10px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.14em; color:var(--muted); margin-bottom:12px;
+  }
+  .row{display:flex; gap:8px; flex-wrap:wrap;}
+  .row > *{flex:1;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+
+  #ui button{
+    font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+    border:1.5px solid var(--ink); background:var(--paper); color:var(--ink);
+    padding:11px 8px; border-radius:0;
+    transition:background .1s, color .1s, border-color .1s;
+  }
+  #ui button:hover{background:var(--ink); color:var(--paper);}
+  #ui button.active{background:var(--blue); border-color:var(--blue); color:var(--paper);}
+  #ui button.primary{background:var(--blue); border-color:var(--blue); color:var(--paper);}
+  #ui button.primary:hover{background:var(--ink); border-color:var(--ink);}
+  #ui button.chip{
+    border:none; background:none; color:var(--blue); text-align:left; padding:5px 0;
+    font-size:10px;
+  }
+  #ui button.chip:hover{background:none; color:var(--ink);}
+  #ui button:disabled{opacity:.25; cursor:default;}
+  .chips{display:flex; flex-direction:column; align-items:flex-start;}
+  .chips + h3{margin-top:12px;}
+  .section h3{font-size:9px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--ink); margin-bottom:2px;}
+
+  #ui .tabs{display:flex; gap:22px; margin-top:6px;}
+  #ui .tabs .tab{
+    border:none; background:none; padding:10px 0 8px; color:var(--muted);
+    border-bottom:3px solid transparent;
+  }
+  #ui .tabs .tab:hover{background:none; color:var(--ink);}
+  #ui .tabs .tab.active{background:none; color:var(--ink); border-bottom-color:var(--blue);}
+
+  .slider-row{display:flex; align-items:center; gap:10px; margin:0 0 10px;}
+  .slider-row:first-of-type{margin-top:14px;}
+  .slider-row label{
+    flex:0 0 76px; font-size:10px; font-weight:700;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+  }
+  .slider-row input[type=range]{flex:1; min-width:0; accent-color:var(--blue); height:14px;}
+  .slider-row output{
+    flex:0 0 36px; text-align:right; font-size:11px; font-weight:700;
+    font-variant-numeric:tabular-nums;
+  }
+  .check-row{
+    display:flex; align-items:center; gap:8px; margin:12px 0 2px;
+    font-size:11px; color:var(--muted); letter-spacing:.01em;
+  }
+  .check-row input{accent-color:var(--blue);}
+
+  #objlist{display:flex; flex-direction:column; margin-top:4px; max-height:220px; overflow-y:auto;}
+  .obj-item{
+    display:flex; align-items:center; gap:10px; padding:9px 0;
+    border-bottom:1px solid #EFEFEF; cursor:pointer;
+    font-size:13px; font-weight:700; letter-spacing:-.01em;
+  }
+  .obj-item .marker{
+    flex:none; width:10px; height:10px;
+    border:1.5px solid var(--ink); background:var(--paper);
+  }
+  .obj-item.selected .marker{background:var(--blue); border-color:var(--blue);}
+  .obj-item:hover .name{color:var(--blue);}
+  .obj-item .name{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  #ui .obj-item .mini{
+    border:none; background:none; color:var(--muted);
+    font-size:9px; letter-spacing:.08em; padding:2px 2px;
+  }
+  #ui .obj-item .mini:hover{background:none; color:var(--ink);}
+  #ui .obj-item .mini.pin.pinned{color:var(--blue);}
+  #ui .obj-item .mini.del{font-size:14px; line-height:1;}
+
+  .stats{
+    font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--muted); font-variant-numeric:tabular-nums; margin-top:12px;
+  }
+
+  #hint{
+    position:absolute; left:0; right:0; bottom:0;
+    background:var(--paper); border-top:1px solid var(--line);
+    padding:10px 22px; font-size:11px; color:var(--muted);
+    letter-spacing:.02em; z-index:10; pointer-events:none;
+  }
+  #hint b{color:var(--ink); font-weight:700;}
+
+  #toast{
+    position:absolute; top:20px; left:50%; transform:translateX(-50%);
+    background:var(--paper); border:1.5px solid var(--ink); color:var(--ink);
+    padding:9px 18px; font-size:12px; z-index:20; max-width:calc(100% - 32px);
+    opacity:0; transition:opacity .2s; pointer-events:none;
+  }
+  #toast.show{opacity:1;}
+  #toast.err{background:var(--ink); color:var(--paper);}
+
+  /* phone: the panel becomes a bottom sheet over the canvas */
+  @media (max-width:720px){
+    #stage{left:0; bottom:var(--sheet, 46vh);}
+    #ui{top:auto; width:100%; height:var(--sheet, 46vh); border-right:none; border-top:1px solid var(--line);}
+    #ui header{padding:12px 16px 10px;}
+    #ui h1{font-size:18px; margin:4px 0 0;}
+    #ui h1 br{display:none;}
+    #ui .subtitle{display:none;}
+    #ui #btn-sheet{display:block; position:absolute; right:16px; top:14px; padding:8px 10px;}
+    #panels{padding:0 16px 24px;}
+    body.sheet-collapsed{--sheet:64px;}
+    body.sheet-collapsed #panels{display:none;}
+    #hint{display:none;}
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/",
+    "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+  }
+}
+</script>
+</head>
+<body>
+<main id="stage">
+  <div id="canvas-wrap"></div>
+  <div id="hint"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+</main>
+
+<div id="ui">
+  <header>
+    <div class="eyebrow"><span class="blue">Tensegrity</span> — Working Model</div>
+    <h1>Floating <br>Compression</h1>
+    <p class="subtitle">Struts in compression · cables in tension</p>
+    <button id="btn-sheet" aria-label="Collapse panel">Hide</button>
+  </header>
+  <div id="panels">
+
+    <div class="section">
+      <h2>Presets &amp; examples</h2>
+      <h3>Presets</h3>
+      <div class="chips">
+        <button class="chip" data-preset="prism">3-Strut Prism — Fuller Simplex</button>
+        <button class="chip" data-preset="box">Box — 4-Strut Square Prism</button>
+        <button class="chip" data-preset="sphere">Sphere — 6-Strut Expanded Octahedron</button>
+        <button class="chip" data-preset="tower">Tower — Stacked Needle Column</button>
+      </div>
+      <h3>Example scenes</h3>
+      <div class="chips">
+        <button class="chip" data-example="floating-table">Floating Table (FBX)</button>
+        <button class="chip" data-example="bow-prism">Bow Prism — curved struts (FBX)</button>
+        <button class="chip" data-example="plate-mobile">Plate Mobile — hanging from anchors (FBX)</button>
+        <button class="chip" data-example="hourglass-box">Hourglass Box (FBX)</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Add objects</h2>
+      <div class="grid2">
+        <button id="btn-fbx">Load FBX…</button>
+        <button id="btn-strut">Strut</button>
+        <button id="btn-box">Box</button>
+        <button id="btn-anchor">Anchor</button>
+      </div>
+      <div id="objlist"></div>
+      <div id="stats" class="stats"></div>
+    </div>
+
+    <div class="section">
+      <h2>Tool</h2>
+      <div class="grid2">
+        <button id="mode-select" class="active">Select / Move</button>
+        <button id="mode-point">Add points</button>
+        <button id="mode-cable">Add cables</button>
+        <button id="mode-delete">Delete</button>
+      </div>
+      <div class="tabs">
+        <button id="giz-t" class="tab active" title="key: G">Move</button>
+        <button id="giz-r" class="tab" title="key: R">Rotate</button>
+        <button id="giz-s" class="tab" title="key: S">Scale</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Simulation</h2>
+      <div class="row">
+        <button id="btn-play" class="primary" title="key: Space">Simulate</button>
+        <button id="btn-reset">Reset</button>
+      </div>
+      <div class="slider-row">
+        <label for="p-grav">Gravity</label>
+        <input type="range" id="p-grav" min="0" max="20" step="0.1" value="9.8">
+        <output id="o-grav">9.8</output>
+      </div>
+      <div class="slider-row">
+        <label for="p-stiff">Stiffness</label>
+        <input type="range" id="p-stiff" min="100" max="4000" step="50" value="1000">
+        <output id="o-stiff">1000</output>
+      </div>
+      <div class="slider-row">
+        <label for="p-damp">Damping</label>
+        <input type="range" id="p-damp" min="0" max="30" step="0.5" value="8">
+        <output id="o-damp">8</output>
+      </div>
+      <div class="slider-row">
+        <label for="p-pre">Prestress</label>
+        <input type="range" id="p-pre" min="0.5" max="1.1" step="0.01" value="0.92">
+        <output id="o-pre">0.92</output>
+      </div>
+      <div class="slider-row">
+        <label for="p-dens">Density</label>
+        <input type="range" id="p-dens" min="0.2" max="5" step="0.1" value="1">
+        <output id="o-dens">1.0</output>
+      </div>
+      <div class="check-row">
+        <input type="checkbox" id="p-coll">
+        <label for="p-coll">Collisions between objects (applied on Simulate)</label>
+      </div>
+      <div id="simstats" class="stats"></div>
+    </div>
+
+    <div class="section">
+      <h2>Scene</h2>
+      <div class="grid2">
+        <button id="btn-save">Save scene</button>
+        <button id="btn-open">Open scene…</button>
+        <button id="btn-frame">Frame all</button>
+        <button id="btn-clear">Clear</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<input type="file" id="fbx-input" accept=".fbx,.FBX" hidden>
+<input type="file" id="scene-input" accept=".json,application/json" hidden>
+
+<script type="module">
+import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+
+/* ============================== state ============================== */
+
+const MODES = { SELECT:'select', POINT:'point', CABLE:'cable', DELETE:'delete' };
+const SIM = { EDIT:0, RUNNING:1, PAUSED:2 };
+
+let mode = MODES.SELECT;
+let simState = SIM.EDIT;
+
+let nextObjId = 1, nextPointId = 1, nextCableId = 1;
+const objects = new Map();   // id -> {id,kind,spec,name,container,halfExtents,fixed,points:[{id,local,marker}],body,savedPos,savedQuat,savedScale}
+const cables  = new Map();   // id -> {id,a:{objId,pointId},b:{objId,pointId},baseLen,tension}
+
+let selectedObj = null;
+let pendingPoint = null;     // {objId,pointId} first endpoint while drawing a cable
+
+const params = {
+  gravity: 9.8, stiffness: 1000, damping: 8, prestress: 0.92, density: 1, collisions: false,
+};
+
+/* ============================== scene ============================== */
+
+const wrap = document.getElementById('canvas-wrap');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+wrap.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff);
+scene.fog = new THREE.Fog(0xffffff, 25, 70);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 300);
+camera.position.set(6, 4.5, 8);
+
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.target.set(0, 1.3, 0);
+orbit.enableDamping = true;
+orbit.dampingFactor = 0.08;
+orbit.maxPolarAngle = Math.PI * 0.495;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0xdddddd, 1.0));
+const sun = new THREE.DirectionalLight(0xffffff, 1.8);
+sun.position.set(6, 12, 5);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.02;
+sun.shadow.camera.left = sun.shadow.camera.bottom = -14;
+sun.shadow.camera.right = sun.shadow.camera.top = 14;
+scene.add(sun);
+
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(40, 64).rotateX(-Math.PI/2),
+  new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.96 })
+);
+ground.receiveShadow = true;
+scene.add(ground);
+
+const grid = new THREE.GridHelper(40, 40, 0xc9c9c9, 0xe7e7e7);
+grid.position.y = 0.001;
+scene.add(grid);
+
+const gizmo = new TransformControls(camera, renderer.domElement);
+gizmo.setSize(0.85);
+scene.add(gizmo);
+gizmo.addEventListener('dragging-changed', e => { orbit.enabled = !e.value; });
+
+let selBox = null; // BoxHelper for selection highlight
+
+function resize(){
+  const w = wrap.clientWidth || 1, h = wrap.clientHeight || 1;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  cableMat.resolution.set(w, h);
+}
+
+/* ============================== materials & shared geo ============================== */
+
+const INK = 0x000000, PAPER = 0xffffff, BLUE = 0x002FA7;
+const strutMat  = new THREE.MeshStandardMaterial({ color:0x161616, roughness:0.5, metalness:0.15 });
+const boxMat    = new THREE.MeshStandardMaterial({ color:0x707070, roughness:0.8 });
+const anchorMat = new THREE.MeshStandardMaterial({ color:BLUE, roughness:0.45, emissive:0x000d33 });
+const markerGeo = new THREE.BoxGeometry(0.11, 0.11, 0.11);
+const markerEdgeGeo = new THREE.EdgesGeometry(markerGeo);
+
+// glossary-style square marker: paper fill + ink border, blue when active
+function setMarkerHot(marker, hot){
+  marker.material.color.setHex(hot ? BLUE : PAPER);
+  marker.children[0].material.color.setHex(hot ? BLUE : INK);
+}
+
+/* ============================== helpers ============================== */
+
+const $ = id => document.getElementById(id);
+
+const toastEl = $('toast');
+let toastTimer = null;
+function toast(msg, isErr = false){
+  toastEl.textContent = msg;
+  toastEl.className = 'show' + (isErr ? ' err' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.className = '', 2600);
+}
+
+const hintEl = $('hint');
+function updateHint(){
+  const hints = {
+    [MODES.SELECT]: '<b>Select</b> — click an object, drag the gizmo. Keys: <b>G</b> move · <b>R</b> rotate · <b>S</b> scale · <b>Del</b> remove · <b>Space</b> simulate',
+    [MODES.POINT]:  '<b>Add points</b> — click anywhere on an object surface to place an attachment point',
+    [MODES.CABLE]:  pendingPoint ? '<b>Add cables</b> — now click a <b>second</b> point (Esc to cancel)'
+                                 : '<b>Add cables</b> — click a first attachment point',
+    [MODES.DELETE]: '<b>Delete</b> — click an object, point, or cable to remove it',
+  };
+  hintEl.innerHTML = simState !== SIM.EDIT
+    ? '<b>Simulating</b> — press Reset to return to editing · <b>Pin</b> objects in the list to hold them'
+    : hints[mode];
+}
+
+function refreshStats(){
+  let np = 0; objects.forEach(o => np += o.points.length);
+  $('stats').textContent = `${objects.size} objects · ${np} points · ${cables.size} cables`;
+}
+
+function requireEdit(){
+  if (simState === SIM.EDIT) return true;
+  toast('Reset the simulation first', true);
+  return false;
+}
+
+/* ============================== object creation ============================== */
+
+// Wraps a mesh root so the container's origin sits at the bounding-box center,
+// records local half-extents for the physics proxy.
+function registerObject(root, name, { kind = 'box', spec = {}, fixed = false, targetSize = null } = {}){
+  root.updateMatrixWorld(true);
+  const bbox = new THREE.Box3().setFromObject(root);
+  const size = bbox.getSize(new THREE.Vector3());
+  const center = bbox.getCenter(new THREE.Vector3());
+
+  let s = 1;
+  if (targetSize){
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    s = targetSize / maxDim;
+  }
+
+  const container = new THREE.Group();
+  root.position.sub(center).multiplyScalar(s);
+  root.scale.multiplyScalar(s);
+  container.add(root);
+
+  const halfExtents = size.clone().multiplyScalar(s * 0.5);
+  halfExtents.x = Math.max(halfExtents.x, 0.03);
+  halfExtents.y = Math.max(halfExtents.y, 0.03);
+  halfExtents.z = Math.max(halfExtents.z, 0.03);
+
+  root.traverse(c => { if (c.isMesh){ c.castShadow = true; c.receiveShadow = true; } });
+
+  const obj = {
+    id: nextObjId++, kind, spec, name, container, halfExtents, fixed,
+    points: [], body: null, savedPos: null, savedQuat: null, savedScale: null,
+  };
+  container.userData.pick = { type:'obj', id: obj.id };
+  objects.set(obj.id, obj);
+  scene.add(container);
+  markObjectList();
+  refreshStats();
+  return obj;
+}
+
+function createStrut(len = 3, radius = 0.09){
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, len, 20), strutMat.clone());
+  const obj = registerObject(mesh, `Strut ${nextObjId}`, { kind:'strut', spec:{ length:len, radius } });
+  // struts get their two end points for free
+  addPoint(obj, new THREE.Vector3(0, -len/2, 0));
+  addPoint(obj, new THREE.Vector3(0,  len/2, 0));
+  return obj;
+}
+
+function createBox(w = 1, h = 1, d = 1){
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), boxMat.clone());
+  return registerObject(mesh, `Box ${nextObjId}`, { kind:'box', spec:{ size:[w, h, d] } });
+}
+
+function createAnchor(){
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 14), anchorMat.clone());
+  const obj = registerObject(mesh, `Anchor ${nextObjId}`, { kind:'anchor', fixed:true });
+  addPoint(obj, new THREE.Vector3(0, 0, 0));
+  return obj;
+}
+
+// FBX scenes are often authored in centimetres — normalize to `size` world units.
+// spec keeps either the source URL or the raw bytes so the scene can be saved.
+function createFBX(buffer, name, { src = null, size = 3 } = {}){
+  const root = new FBXLoader().parse(buffer, '');
+  // exported meshes often have flipped or open faces — render both sides
+  root.traverse(c => {
+    if (c.isMesh) for (const m of [].concat(c.material)) m.side = THREE.DoubleSide;
+  });
+  const spec = src ? { src, size } : { data: buffer, size };
+  return registerObject(root, name, { kind:'fbx', spec, targetSize: size });
+}
+
+async function loadFBXFile(file){
+  if (!requireEdit()) return;
+  toast(`Loading ${file.name}…`);
+  try{
+    const obj = createFBX(await file.arrayBuffer(), file.name.replace(/\.fbx$/i, ''));
+    obj.container.position.set(0, obj.halfExtents.y + 0.02, 0);
+    selectObject(obj);
+    toast(`Loaded ${obj.name} — switch to “Add points” to place attachments`);
+  }catch(err){
+    console.error(err);
+    toast(`Could not parse FBX: ${err.message || err}`, true);
+  }
+}
+
+/* ============================== points & cables ============================== */
+
+function addPoint(obj, localPos){
+  const marker = new THREE.Mesh(markerGeo, new THREE.MeshBasicMaterial({ color: PAPER }));
+  marker.add(new THREE.LineSegments(markerEdgeGeo, new THREE.LineBasicMaterial({ color: INK })));
+  marker.position.copy(localPos);
+  const point = { id: nextPointId++, local: localPos.clone(), marker };
+  marker.userData.pick = { type:'point', objId: obj.id, pointId: point.id };
+  obj.container.add(marker);
+  obj.points.push(point);
+  refreshStats();
+  return point;
+}
+
+function getPoint(objId, pointId){
+  const obj = objects.get(objId);
+  return obj ? { obj, point: obj.points.find(p => p.id === pointId) } : { obj:null, point:null };
+}
+
+const _q = new THREE.Quaternion();
+function pointWorld(objId, pointId, target){
+  const { obj, point } = getPoint(objId, pointId);
+  if (!obj || !point) return null;
+  if (obj.body){
+    // exact: derive from the physics body so forces don't lag the render sync
+    const q = obj.body.quaternion;
+    target.copy(point.local).multiply(obj.container.scale).applyQuaternion(_q.set(q.x, q.y, q.z, q.w));
+    const p = obj.body.position;
+    target.x += p.x; target.y += p.y; target.z += p.z;
+  } else {
+    point.marker.getWorldPosition(target);
+  }
+  return target;
+}
+
+const _wa = new THREE.Vector3(), _wb = new THREE.Vector3();
+const sameRef = (x, y) => x.objId === y.objId && x.pointId === y.pointId;
+
+function addCable(aRef, bRef, { quiet = false } = {}){
+  if (sameRef(aRef, bRef)) return null;
+  for (const c of cables.values()){
+    if ((sameRef(c.a, aRef) && sameRef(c.b, bRef)) || (sameRef(c.a, bRef) && sameRef(c.b, aRef))){
+      if (!quiet) toast('These points are already connected');
+      return null;
+    }
+  }
+  if (!pointWorld(aRef.objId, aRef.pointId, _wa) || !pointWorld(bRef.objId, bRef.pointId, _wb)) return null;
+  const cable = { id: nextCableId++, a:{...aRef}, b:{...bRef}, baseLen: _wa.distanceTo(_wb), tension:0 };
+  cables.set(cable.id, cable);
+  cablesDirty = true;
+  refreshStats();
+  return cable;
+}
+
+function removeCable(id){
+  if (!cables.delete(id)) return;
+  cablesDirty = true;
+  refreshStats();
+}
+
+function removePoint(objId, pointId){
+  const { obj, point } = getPoint(objId, pointId);
+  if (!obj || !point) return;
+  for (const c of [...cables.values()]){
+    if ((c.a.objId===objId && c.a.pointId===pointId) || (c.b.objId===objId && c.b.pointId===pointId))
+      removeCable(c.id);
+  }
+  if (pendingPoint && sameRef(pendingPoint, { objId, pointId })) pendingPoint = null;
+  obj.container.remove(point.marker);
+  point.marker.material.dispose();
+  point.marker.children[0]?.material.dispose();
+  obj.points = obj.points.filter(p => p !== point);
+  refreshStats();
+}
+
+function removeObject(id){
+  const obj = objects.get(id);
+  if (!obj) return;
+  for (const p of [...obj.points]) removePoint(id, p.id);
+  if (selectedObj === obj) deselect();
+  scene.remove(obj.container);
+  obj.container.traverse(c => {
+    if (!c.isMesh) return;
+    c.geometry?.dispose();
+    for (const m of [].concat(c.material)) m?.dispose?.();
+  });
+  objects.delete(id);
+  markObjectList();
+  refreshStats();
+}
+
+function clearScene(){
+  if (simState !== SIM.EDIT) stopSimulation(false);
+  cancelPendingCable();
+  deselect();
+  for (const id of [...objects.keys()]) removeObject(id);
+  nextObjId = nextPointId = nextCableId = 1;
+}
+
+/* ============================== cable rendering ============================== */
+// All cables live in one fat-line mesh: one draw call, one buffer upload per frame.
+
+const cableMat = new LineMaterial({ linewidth: 2.2, vertexColors: true, worldUnits: false });
+let cableLines = null;
+let cableOrder = [];          // index in the line buffer -> cable
+let cablesDirty = true;
+
+function rebuildCableLines(){
+  cablesDirty = false;
+  if (cableLines){ scene.remove(cableLines); cableLines.geometry.dispose(); cableLines = null; }
+  cableOrder = [...cables.values()];
+  if (!cableOrder.length) return;
+  const geo = new LineSegmentsGeometry();
+  geo.setPositions(new Float32Array(cableOrder.length * 6));
+  geo.setColors(new Float32Array(cableOrder.length * 6));
+  cableLines = new LineSegments2(geo, cableMat);
+  cableLines.frustumCulled = false;
+  scene.add(cableLines);
+}
+
+const SLACK = new THREE.Color(0xc6c6c6);
+const TAUT_LO = new THREE.Color(0x002FA7);
+const TAUT_HI = new THREE.Color(0x000000);
+const EDIT_COL = new THREE.Color(0x6f86cc);
+const _tmpColor = new THREE.Color();
+
+function updateCableLines(){
+  if (cablesDirty) rebuildCableLines();
+  if (!cableLines) return;
+  const posAttr = cableLines.geometry.attributes.instanceStart.data;
+  const colAttr = cableLines.geometry.attributes.instanceColorStart.data;
+  const pos = posAttr.array, col = colAttr.array;
+  const editing = simState === SIM.EDIT;
+  for (let i = 0; i < cableOrder.length; i++){
+    const c = cableOrder[i];
+    if (!pointWorld(c.a.objId, c.a.pointId, _wa) || !pointWorld(c.b.objId, c.b.pointId, _wb)) continue;
+    const k = i * 6;
+    pos[k] = _wa.x; pos[k+1] = _wa.y; pos[k+2] = _wa.z;
+    pos[k+3] = _wb.x; pos[k+4] = _wb.y; pos[k+5] = _wb.z;
+
+    if (editing) _tmpColor.copy(params.prestress < 1 ? EDIT_COL : SLACK);
+    else if (c.tension <= 0) _tmpColor.copy(SLACK);
+    else _tmpColor.copy(TAUT_LO).lerp(TAUT_HI, Math.min(c.tension / tensionScale, 1));
+    col[k] = col[k+3] = _tmpColor.r; col[k+1] = col[k+4] = _tmpColor.g; col[k+2] = col[k+5] = _tmpColor.b;
+  }
+  posAttr.needsUpdate = true;
+  colAttr.needsUpdate = true;
+}
+
+/* ============================== selection ============================== */
+
+function selectObject(obj){
+  deselect();
+  selectedObj = obj;
+  if (simState === SIM.EDIT) gizmo.attach(obj.container);
+  selBox = new THREE.BoxHelper(obj.container, BLUE);
+  scene.add(selBox);
+  markObjectList();
+}
+
+function deselect(){
+  gizmo.detach();
+  if (selBox){ scene.remove(selBox); selBox.geometry.dispose(); selBox.material.dispose(); selBox = null; }
+  if (selectedObj){ selectedObj = null; markObjectList(); }
+}
+
+function cancelPendingCable(){
+  if (pendingPoint){
+    const { point } = getPoint(pendingPoint.objId, pendingPoint.pointId);
+    if (point) setMarkerHot(point.marker, false);
+    pendingPoint = null;
+    updateHint();
+  }
+}
+
+/* ============================== picking ============================== */
+
+const raycaster = new THREE.Raycaster();
+raycaster.params.Line2 = { threshold: 8 };   // px, on top of the line width
+raycaster.params.Line.threshold = 0.01;      // marker outlines: only the box itself should pick
+const pointerNdc = new THREE.Vector2();
+let downX = 0, downY = 0, downOnGizmo = false;
+
+function pickAt(clientX, clientY, { wantPoints=true, wantCables=true, wantObjects=true } = {}){
+  const r = renderer.domElement.getBoundingClientRect();
+  pointerNdc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(pointerNdc, camera);
+  const targets = [];
+  objects.forEach(o => targets.push(o.container));
+  if (wantCables) updateCableLines();
+  if (wantCables && cableLines){
+    // the fat-line raycast culls with both cached bounds; the cables have moved since
+    cableLines.geometry.computeBoundingSphere();
+    cableLines.geometry.computeBoundingBox();
+    targets.push(cableLines);
+  }
+  const hits = raycaster.intersectObjects(targets, true);
+  for (const hit of hits){
+    if (hit.object === cableLines){
+      const c = cableOrder[hit.faceIndex];
+      if (c) return { pick:{ type:'cable', id:c.id }, hit };
+      continue;
+    }
+    let o = hit.object;
+    while (o){
+      const pk = o.userData.pick;
+      if (pk){
+        if (pk.type === 'point' && wantPoints) return { pick:pk, hit };
+        if (pk.type === 'obj'){
+          if (wantObjects) return { pick:pk, hit };
+          break; // this hit belongs to an object we don't want — try next hit
+        }
+      }
+      o = o.parent;
+    }
+  }
+  return null;
+}
+
+renderer.domElement.addEventListener('pointerdown', e => {
+  downX = e.clientX; downY = e.clientY;
+  downOnGizmo = gizmo.object && gizmo.axis !== null; // hovering a gizmo handle
+});
+
+renderer.domElement.addEventListener('pointerup', e => {
+  if (e.button !== 0) return;
+  if (downOnGizmo) return;
+  if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6) return; // was a camera drag
+  handleClick(e.clientX, e.clientY);
+});
+
+function handleClick(x, y){
+  if (simState !== SIM.EDIT && mode !== MODES.SELECT) return;
+
+  if (mode === MODES.SELECT){
+    const res = pickAt(x, y, { wantPoints:false, wantCables:false });
+    if (res && res.pick.type === 'obj') selectObject(objects.get(res.pick.id));
+    else deselect();
+    return;
+  }
+
+  if (mode === MODES.POINT){
+    const res = pickAt(x, y, { wantPoints:false, wantCables:false });
+    if (res && res.pick.type === 'obj'){
+      const obj = objects.get(res.pick.id);
+      addPoint(obj, obj.container.worldToLocal(res.hit.point.clone()));
+      toast('Attachment point added');
+    }
+    return;
+  }
+
+  if (mode === MODES.CABLE){
+    const res = pickAt(x, y, { wantCables:false, wantObjects:false });
+    if (!(res && res.pick.type === 'point')) return;
+    const ref = { objId: res.pick.objId, pointId: res.pick.pointId };
+    if (!pendingPoint){
+      pendingPoint = ref;
+      setMarkerHot(getPoint(ref.objId, ref.pointId).point.marker, true);
+      updateHint();
+    } else {
+      if (sameRef(pendingPoint, ref)){ cancelPendingCable(); return; }
+      const a = pendingPoint;
+      cancelPendingCable();
+      if (addCable(a, ref)) toast('Cable added');
+    }
+    return;
+  }
+
+  if (mode === MODES.DELETE){
+    const res = pickAt(x, y);
+    if (!res) return;
+    if (res.pick.type === 'point'){ removePoint(res.pick.objId, res.pick.pointId); toast('Point removed'); }
+    else if (res.pick.type === 'cable'){ removeCable(res.pick.id); toast('Cable removed'); }
+    else if (res.pick.type === 'obj'){ removeObject(res.pick.id); toast('Object removed'); }
+  }
+}
+
+/* ============================== physics ============================== */
+// Cables are explicit spring-dampers applied at their exact attachment points.
+// Stiffness is axial (EA): force = EA · strain, so short cables are stiffer, as real
+// ones are. Explicit springs are only stable below a critical time step, which depends
+// on stiffness, the lightest body and its smallest moment of inertia — so the step is
+// derived from the current scene. Damping is capped per cable so it can never
+// overshoot within one step, which keeps it out of the time-step limit.
+
+let world = null;
+const GROUP_GROUND = 1, GROUP_OBJ = 2;
+const MAX_FORCE = 2500;
+const MIN_INERTIA_RATIO = 0.15;   // thin struts: don't let the spin about the long axis be ~free
+const H_MIN = 1/4000, H_MAX = 1/240, MAX_STEPS_PER_FRAME = 200;
+const MASS_SCALE = 2;             // kg per unit volume at density 1
+const FBX_FILL = 0.12;            // imported meshes fill only part of their bounding box
+let stepH = H_MAX;
+let simSpeed = 1;                 // < 1 when the step budget can't keep up with real time
+let tensionScale = 80;
+
+function objectVolume(obj, he){
+  if (obj.kind === 'strut'){
+    const sc = obj.container.scale;
+    return Math.PI * (obj.spec.radius * Math.abs(sc.x)) * (obj.spec.radius * Math.abs(sc.z)) * obj.spec.length * Math.abs(sc.y);
+  }
+  return 8 * he.x * he.y * he.z * (obj.kind === 'fbx' ? FBX_FILL : 1);
+}
+
+function setBodyMass(obj){
+  const b = obj.body;
+  if (obj.fixed){
+    b.type = CANNON.Body.STATIC; b.mass = 0;
+    b.velocity.setZero(); b.angularVelocity.setZero();
+  } else {
+    b.type = CANNON.Body.DYNAMIC; b.mass = obj.mass;
+  }
+  b.updateMassProperties();
+  if (b.mass > 0){
+    const I = b.inertia, floor = Math.max(I.x, I.y, I.z) * MIN_INERTIA_RATIO;
+    I.set(Math.max(I.x, floor), Math.max(I.y, floor), Math.max(I.z, floor));
+    b.invInertia.set(1/I.x, 1/I.y, 1/I.z);
+    b.updateInertiaWorld(true);
+  }
+  b.aabbNeedsUpdate = true;
+}
+
+function buildWorld(){
+  world = new CANNON.World({ gravity: new CANNON.Vec3(0, -params.gravity, 0) });
+  world.solver.iterations = 10;
+  world.allowSleep = false;
+  world.defaultContactMaterial.friction = 0.5;
+  world.defaultContactMaterial.restitution = 0.05;
+
+  const groundBody = new CANNON.Body({ type: CANNON.Body.STATIC, shape: new CANNON.Plane() });
+  groundBody.quaternion.setFromEuler(-Math.PI/2, 0, 0);
+  groundBody.collisionFilterGroup = GROUP_GROUND;
+  groundBody.collisionFilterMask = -1;
+  world.addBody(groundBody);
+
+  objects.forEach(obj => {
+    obj.container.updateMatrixWorld(true);
+    const sc = obj.container.scale;
+    const he = new CANNON.Vec3(
+      Math.max(obj.halfExtents.x * Math.abs(sc.x), 0.03),
+      Math.max(obj.halfExtents.y * Math.abs(sc.y), 0.03),
+      Math.max(obj.halfExtents.z * Math.abs(sc.z), 0.03),
+    );
+    obj.mass = Math.max(0.05, objectVolume(obj, he) * params.density * MASS_SCALE);
+
+    const body = new CANNON.Body({ mass: obj.mass, shape: new CANNON.Box(he) });
+    body.position.copy(obj.container.position);
+    body.quaternion.copy(obj.container.quaternion);
+    body.linearDamping = 0.1;
+    body.angularDamping = 0.1;
+    body.collisionFilterGroup = GROUP_OBJ;
+    body.collisionFilterMask = params.collisions ? -1 : GROUP_GROUND;
+    world.addBody(body);
+    obj.body = body;
+    setBodyMass(obj);
+
+    obj.savedPos = obj.container.position.clone();
+    obj.savedQuat = obj.container.quaternion.clone();
+    obj.savedScale = obj.container.scale.clone();
+  });
+
+  // the drawn length is the cable's length at the moment Simulate is pressed
+  cables.forEach(c => {
+    pointWorld(c.a.objId, c.a.pointId, _wa);
+    pointWorld(c.b.objId, c.b.pointId, _wb);
+    c.baseLen = _wa.distanceTo(_wb);
+    c.tension = 0;
+  });
+  updateStepSize();
+}
+
+// inverse effective mass of a body for a pull at world point p (translation + worst-case rotation)
+function mobility(b, p){
+  if (!b || b.mass === 0) return 0;
+  const I = b.inertia;
+  const r2 = (p.x-b.position.x)**2 + (p.y-b.position.y)**2 + (p.z-b.position.z)**2;
+  return 1 / b.mass + r2 / Math.min(I.x, I.y, I.z);
+}
+
+function updateStepSize(){
+  if (!world) return;
+  const live = [];
+  const kSum = new Map(), mobMax = new Map();
+  const add = (b, k, mob) => {
+    if (!b || b.mass === 0) return;
+    kSum.set(b, (kSum.get(b) || 0) + k);
+    mobMax.set(b, Math.max(mobMax.get(b) || 0, mob));
+  };
+  cables.forEach(c => {
+    if (!pointWorld(c.a.objId, c.a.pointId, _wa) || !pointWorld(c.b.objId, c.b.pointId, _wb)) return;
+    const bA = objects.get(c.a.objId)?.body, bB = objects.get(c.b.objId)?.body;
+    const mA = mobility(bA, _wa), mB = mobility(bB, _wb);
+    const k = params.stiffness / Math.max(c.baseLen * params.prestress, 0.05);
+    add(bA, k, mA); add(bB, k, mB);
+    live.push([c, mA + mB]);
+  });
+  let h = H_MAX;
+  kSum.forEach((k, b) => { h = Math.min(h, 0.5 / Math.sqrt(k * mobMax.get(b))); });
+  stepH = Math.max(H_MIN, h);
+  // damping may remove at most ~all relative velocity along the cable in one step
+  for (const [c, mob] of live) c.cMax = mob > 0 ? 0.8 / (mob * stepH) : Infinity;
+  tensionScale = Math.max(20, params.stiffness * 0.15);
+}
+
+function stopSimulation(restore){
+  simState = SIM.EDIT;
+  objects.forEach(obj => {
+    obj.body = null;
+    if (restore && obj.savedPos){
+      obj.container.position.copy(obj.savedPos);
+      obj.container.quaternion.copy(obj.savedQuat);
+      obj.container.scale.copy(obj.savedScale);
+    }
+  });
+  world = null;
+  cables.forEach(c => c.tension = 0);
+  playBtn.textContent = 'Simulate';
+  if (selectedObj) gizmo.attach(selectedObj.container);
+  $('simstats').textContent = '';
+  updateHint();
+}
+
+const _fa = new THREE.Vector3(), _fb = new THREE.Vector3(), _dir = new THREE.Vector3();
+const _pa = new CANNON.Vec3(), _pb = new CANNON.Vec3();
+const _cva = new CANNON.Vec3(), _cvb = new CANNON.Vec3();
+const _force = new CANNON.Vec3(), _rel = new CANNON.Vec3();
+
+function applyCableForces(){
+  const EA = params.stiffness, pre = params.prestress;
+  cables.forEach(c => {
+    c.tension = 0;
+    const objA = objects.get(c.a.objId), objB = objects.get(c.b.objId);
+    const bodyA = objA?.body, bodyB = objB?.body;
+    if (!bodyA || !bodyB) return;
+    if (!pointWorld(c.a.objId, c.a.pointId, _fa) || !pointWorld(c.b.objId, c.b.pointId, _fb)) return;
+    _dir.subVectors(_fb, _fa);
+    const dist = _dir.length();
+    const rest = c.baseLen * pre;
+    if (dist <= rest || dist < 1e-6) return;   // cables cannot push — that's tensegrity
+    _dir.divideScalar(dist);
+
+    // relative velocity of the two anchor points along the cable axis
+    _pa.set(_fa.x, _fa.y, _fa.z);
+    _pb.set(_fb.x, _fb.y, _fb.z);
+    bodyA.getVelocityAtWorldPoint(_pa, _cva);
+    bodyB.getVelocityAtWorldPoint(_pb, _cvb);
+    const vRel = (_cvb.x - _cva.x)*_dir.x + (_cvb.y - _cva.y)*_dir.y + (_cvb.z - _cva.z)*_dir.z;
+
+    let f = EA * (dist - rest) / rest + Math.min(params.damping, c.cMax ?? Infinity) * vRel;
+    f = Math.min(Math.max(f, 0), MAX_FORCE);
+    c.tension = f;
+    if (f === 0) return;
+
+    if (bodyA.mass > 0){
+      _force.set(_dir.x * f, _dir.y * f, _dir.z * f);
+      _rel.set(_fa.x - bodyA.position.x, _fa.y - bodyA.position.y, _fa.z - bodyA.position.z);
+      bodyA.applyForce(_force, _rel);
+    }
+    if (bodyB.mass > 0){
+      _force.set(-_dir.x * f, -_dir.y * f, -_dir.z * f);
+      _rel.set(_fb.x - bodyB.position.x, _fb.y - bodyB.position.y, _fb.z - bodyB.position.z);
+      bodyB.applyForce(_force, _rel);
+    }
+  });
+}
+
+function syncMeshes(){
+  objects.forEach(obj => {
+    if (!obj.body) return;
+    obj.container.position.copy(obj.body.position);
+    obj.container.quaternion.copy(obj.body.quaternion);
+  });
+}
+
+/* ============================== presets ============================== */
+// Every preset is a graph: nodes, struts (pairs of nodes) and cables (pairs of nodes).
+// Each node must be the end of exactly one strut — the classic "class 1" tensegrity.
+
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+function buildGraph({ nodes, struts, cables: cableList, radius = 0.08, liftTo = 0.12 }){
+  clearScene();
+  const minY = Math.min(...nodes.map(n => n.y));
+  const lift = liftTo - minY;
+  const refs = new Array(nodes.length);
+  const up = V(0, 1, 0);
+  for (const [i, j] of struts){
+    const p = nodes[i].clone().setY(nodes[i].y + lift), q = nodes[j].clone().setY(nodes[j].y + lift);
+    const dir = q.clone().sub(p);
+    const obj = createStrut(dir.length(), radius);
+    obj.container.position.copy(p).add(q).multiplyScalar(0.5);
+    obj.container.quaternion.setFromUnitVectors(up, dir.normalize());
+    obj.container.updateMatrixWorld(true);
+    refs[i] = { objId: obj.id, pointId: obj.points[0].id };
+    refs[j] = { objId: obj.id, pointId: obj.points[1].id };
+  }
+  for (const [i, j] of cableList) addCable(refs[i], refs[j], { quiet:true });
+  markObjectList();
+  frameAll();
+}
+
+// n-strut prism. Struts span 90°+180°/n around the axis; the "vertical" cables
+// span 90°−180°/n, connecting each bottom node to the nearer top node.
+function prismGraph(n, r, h, { y0 = 0, chirality = 1, phase = 0, rTop = r } = {}){
+  const twist = chirality * (Math.PI/2 + Math.PI/n);
+  const nodes = [], struts = [], cableList = [];
+  for (let i = 0; i < n; i++){
+    const a = phase + i * 2*Math.PI/n;
+    nodes[i] = V(r * Math.cos(a), y0, r * Math.sin(a));
+    nodes[n+i] = V(rTop * Math.cos(a + twist), y0 + h, rTop * Math.sin(a + twist));
+  }
+  for (let i = 0; i < n; i++){
+    const j = (i + 1) % n;
+    struts.push([i, n+i]);
+    cableList.push([i, j], [n+i, n+j]);                    // bottom & top polygons
+    cableList.push([i, n + (i - chirality + n) % n]);       // verticals
+  }
+  return { nodes, struts, cables: cableList, topPhase: phase + twist };
+}
+
+// Expanded octahedron: three orthogonal pairs of parallel struts. Cable topology is
+// the icosahedron's 24 edges that don't join a strut pair; at equilibrium the pair
+// spacing is half the strut length.
+function octahedronGraph(L){
+  const icoPts = [], realPts = [];
+  const phi = (1 + Math.sqrt(5)) / 2;
+  const perm = [(a,b,c)=>[a,b,c], (a,b,c)=>[c,a,b], (a,b,c)=>[b,c,a]];
+  const struts = [];
+  for (const P of perm){
+    for (const s of [1, -1]){
+      const i = icoPts.length;
+      icoPts.push(V(...P(0, s, phi)), V(...P(0, s, -phi)));
+      realPts.push(V(...P(0, s*L/2, L)), V(...P(0, s*L/2, -L)));
+      struts.push([i, i+1]);
+    }
+  }
+  const partner = i => { const g = Math.floor(i / 4) * 4; return [g, g+1, g+2, g+3]; };
+  const cableList = [];
+  for (let i = 0; i < 12; i++) for (let j = i+1; j < 12; j++){
+    if (partner(i).includes(j)) continue;
+    if (Math.abs(icoPts[i].distanceTo(icoPts[j]) - 2) < 1e-6) cableList.push([i, j]);
+  }
+  return { nodes: realPts, struts, cables: cableList };
+}
+
+// Snelson-style needle tower: 3-strut prisms of alternating twist, each overlapping
+// the one below. Inside the column the horizontal triangles are dropped; instead each
+// upper bottom node hangs from the two nearest top nodes below (saddle cables) and is
+// tied down to the nearest bottom node below (diagonal), and each lower top node is
+// tied up to the nearest top node above (vertical). Every inner node then has four
+// cables and one strut, and the column is prestress-stable.
+function towerGraph(modules = 5, r = 1.0, h = 2.3, overlap = 0.6, taper = 0.9){
+  const nodes = [], struts = [], cableList = [];
+  const nearest = (a, cands, k) =>
+    [...cands].sort((p, q) => nodes[a].distanceTo(nodes[p]) - nodes[a].distanceTo(nodes[q])).slice(0, k);
+  let phase = 0, y = 0, rad = r, prev = null;
+  for (let m = 0; m < modules; m++){
+    const g = prismGraph(3, rad, h, { y0: y, chirality: m % 2 ? -1 : 1, phase, rTop: rad * taper });
+    const off = nodes.length;
+    nodes.push(...g.nodes);
+    for (const [i, j] of g.struts) struts.push([off+i, off+j]);
+    for (const [i, j] of g.cables){
+      if (i < 3 && j < 3 && m > 0) continue;                 // inner bottom triangle
+      if (i >= 3 && j >= 3 && m < modules - 1) continue;     // inner top triangle
+      cableList.push([off+i, off+j]);
+    }
+    const bot = [0, 1, 2].map(i => off + i), top = [3, 4, 5].map(i => off + i);
+    if (prev){
+      for (const b of bot){
+        for (const t of nearest(b, prev.top, 2)) cableList.push([b, t]);
+        cableList.push([b, nearest(b, prev.bot, 1)[0]]);
+      }
+      for (const t of prev.top) cableList.push([t, nearest(t, top, 1)[0]]);
+    }
+    prev = { bot, top };
+    phase = g.topPhase + Math.PI/3;     // next bottom nodes sit between these top nodes
+    y += h - overlap;
+    rad *= taper;
+  }
+  return { nodes, struts, cables: cableList };
+}
+
+const PRESETS = {
+  prism:   { label:'Simplex built', build: () => prismGraph(3, 1.6, 2.6) },
+  box:     { label:'Square prism built', build: () => prismGraph(4, 1.7, 2.4, { phase: Math.PI/4 }) },
+  sphere:  { label:'Expanded octahedron built', build: () => octahedronGraph(1.7), radius: 0.07 },
+  tower:   { label:'Needle tower built', build: () => towerGraph(5), radius: 0.06 },
+};
+
+function buildPreset(name){
+  if (!requireEdit()) return;
+  const p = PRESETS[name];
+  buildGraph({ ...p.build(), radius: p.radius ?? 0.08 });
+  toast(`${p.label} — press Simulate and watch it find its form`);
+}
+
+/* ============================== scene files ============================== */
+
+const v3 = v => [+v.x.toFixed(5), +v.y.toFixed(5), +v.z.toFixed(5)];
+const q4 = q => [+q.x.toFixed(6), +q.y.toFixed(6), +q.z.toFixed(6), +q.w.toFixed(6)];
+
+function bufToB64(buf){
+  const bytes = new Uint8Array(buf);
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+function b64ToBuf(b64){
+  const s = atob(b64), bytes = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
+  return bytes.buffer;
+}
+
+// a saved scene is opened relative to the page, so store page-relative FBX paths
+function relativeToPage(href){
+  const dir = new URL('.', location.href).href;
+  return href.startsWith(dir) ? href.slice(dir.length) : href;
+}
+
+function serializeScene(){
+  const pose = obj => simState === SIM.EDIT || !obj.savedPos
+    ? { p: obj.container.position, q: obj.container.quaternion, s: obj.container.scale }
+    : { p: obj.savedPos, q: obj.savedQuat, s: obj.savedScale };
+  const index = new Map();
+  const objs = [...objects.values()].map((obj, i) => {
+    index.set(obj.id, i);
+    const { p, q, s } = pose(obj);
+    const o = { kind: obj.kind, name: obj.name, position: v3(p), quaternion: q4(q), scale: v3(s), fixed: obj.fixed };
+    if (obj.kind === 'strut'){ o.length = obj.spec.length; o.radius = obj.spec.radius; }
+    if (obj.kind === 'box') o.size = obj.spec.size;
+    if (obj.kind === 'fbx'){
+      o.size = obj.spec.size;
+      if (obj.spec.src) o.src = relativeToPage(obj.spec.src); else o.data = bufToB64(obj.spec.data);
+    }
+    o.points = obj.points.map(pt => v3(pt.local));
+    return o;
+  });
+  const ref = r => {
+    const obj = objects.get(r.objId);
+    return [index.get(r.objId), obj.points.findIndex(p => p.id === r.pointId)];
+  };
+  return {
+    format: 'tensegrity-lab', version: 1,
+    params: { ...params },
+    camera: { position: v3(camera.position), target: v3(orbit.target) },
+    objects: objs,
+    cables: [...cables.values()].map(c => [...ref(c.a), ...ref(c.b)]),
+  };
+}
+
+async function loadScene(data, baseUrl = location.href){
+  if (data?.format !== 'tensegrity-lab') throw new Error('not a tensegrity-lab scene file');
+  clearScene();
+  Object.assign(params, data.params || {});
+  syncSliders();
+
+  const made = [];
+  for (const o of data.objects){
+    let obj;
+    if (o.kind === 'strut') obj = createStrut(o.length, o.radius);
+    else if (o.kind === 'anchor') obj = createAnchor();
+    else if (o.kind === 'box') obj = createBox(...o.size);
+    else if (o.kind === 'fbx'){
+      // src is relative to the scene file; keep it as an absolute URL until saved
+      const href = o.data ? null : new URL(o.src, baseUrl).href;
+      const buf = o.data ? b64ToBuf(o.data)
+        : await fetch(href, { cache:'no-cache' }).then(r => { if (!r.ok) throw new Error(`${o.src}: HTTP ${r.status}`); return r.arrayBuffer(); });
+      obj = createFBX(buf, o.name, { src: href, size: o.size ?? 3 });
+    } else throw new Error(`unknown object kind “${o.kind}”`);
+    obj.name = o.name ?? obj.name;
+    obj.fixed = !!o.fixed;
+    obj.container.position.fromArray(o.position);
+    obj.container.quaternion.fromArray(o.quaternion);
+    obj.container.scale.fromArray(o.scale ?? [1, 1, 1]);
+    obj.container.updateMatrixWorld(true);
+    // built-in kinds create default points; the file is authoritative
+    for (const p of [...obj.points]) removePoint(obj.id, p.id);
+    for (const p of o.points || []) addPoint(obj, new THREE.Vector3().fromArray(p));
+    made.push(obj);
+  }
+  for (const [oa, pa, ob, pb] of data.cables || []){
+    const A = made[oa], B = made[ob];
+    if (A?.points[pa] && B?.points[pb])
+      addCable({ objId:A.id, pointId:A.points[pa].id }, { objId:B.id, pointId:B.points[pb].id }, { quiet:true });
+  }
+  markObjectList();
+  if (data.camera){
+    camera.position.fromArray(data.camera.position);
+    orbit.target.fromArray(data.camera.target);
+  } else frameAll();
+}
+
+function download(name, text){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type:'application/json' }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+async function loadExample(name){
+  if (!requireEdit()) return;
+  toast(`Loading ${name}…`);
+  try{
+    const url = new URL(`examples/${name}.json`, location.href);
+    const res = await fetch(url, { cache:'no-cache' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    await loadScene(await res.json(), url);
+    toast(`${name.replace(/-/g, ' ')} loaded — press Simulate`);
+  }catch(err){
+    console.error(err);
+    toast(location.protocol === 'file:'
+      ? 'Examples need the page served over http (e.g. python3 -m http.server)'
+      : `Could not load example: ${err.message || err}`, true);
+  }
+}
+
+function frameAll(){
+  const box = new THREE.Box3();
+  objects.forEach(o => box.expandByObject(o.container));
+  if (box.isEmpty()) return;
+  const c = box.getCenter(new THREE.Vector3());
+  const r = box.getSize(new THREE.Vector3()).length() / 2;
+  const fov = Math.min(camera.fov, THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect)));
+  const dist = r / Math.sin(THREE.MathUtils.degToRad(fov / 2)) * 1.15;
+  const dir = camera.position.clone().sub(orbit.target).normalize();
+  orbit.target.copy(c);
+  camera.position.copy(c).addScaledVector(dir, Math.max(dist, 3));
+}
+
+/* ============================== UI wiring ============================== */
+
+// rebuilt at most once per task, however many objects a preset adds
+let objectListQueued = false;
+function markObjectList(){
+  if (objectListQueued) return;
+  objectListQueued = true;
+  queueMicrotask(refreshObjectList);
+}
+function refreshObjectList(){
+  objectListQueued = false;
+  const list = $('objlist');
+  const frag = document.createDocumentFragment();
+  objects.forEach(obj => {
+    const item = document.createElement('div');
+    item.className = 'obj-item' + (obj === selectedObj ? ' selected' : '');
+    item.dataset.id = obj.id;
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = obj.name;
+    item.innerHTML = '<span class="marker"></span>';
+    item.append(name);
+    item.insertAdjacentHTML('beforeend',
+      `<button class="mini pin ${obj.fixed ? 'pinned' : ''}" title="pin in place (static during simulation)">Pin</button>` +
+      `<button class="mini del" title="delete">×</button>`);
+    frag.append(item);
+  });
+  list.replaceChildren(frag);
+}
+
+$('objlist').addEventListener('click', e => {
+  const item = e.target.closest('.obj-item');
+  const obj = item && objects.get(+item.dataset.id);
+  if (!obj) return;
+  if (e.target.classList.contains('pin')){
+    obj.fixed = !obj.fixed;
+    e.target.classList.toggle('pinned', obj.fixed);
+    if (obj.body){ setBodyMass(obj); updateStepSize(); }
+    toast(obj.fixed ? `${obj.name} pinned (will not move)` : `${obj.name} unpinned`);
+    return;
+  }
+  if (e.target.classList.contains('del')){
+    if (requireEdit()) removeObject(obj.id);
+    return;
+  }
+  selectObject(obj);
+});
+
+function setMode(m){
+  mode = m;
+  cancelPendingCable();
+  if (m !== MODES.SELECT) deselect();
+  for (const [id, mm] of [['mode-select',MODES.SELECT],['mode-point',MODES.POINT],['mode-cable',MODES.CABLE],['mode-delete',MODES.DELETE]])
+    $(id).classList.toggle('active', mm === m);
+  updateHint();
+}
+$('mode-select').onclick = () => setMode(MODES.SELECT);
+$('mode-point').onclick  = () => setMode(MODES.POINT);
+$('mode-cable').onclick  = () => setMode(MODES.CABLE);
+$('mode-delete').onclick = () => setMode(MODES.DELETE);
+
+function setGizmoMode(m){
+  gizmo.setMode(m);
+  $('giz-t').classList.toggle('active', m === 'translate');
+  $('giz-r').classList.toggle('active', m === 'rotate');
+  $('giz-s').classList.toggle('active', m === 'scale');
+}
+$('giz-t').onclick = () => setGizmoMode('translate');
+$('giz-r').onclick = () => setGizmoMode('rotate');
+$('giz-s').onclick = () => setGizmoMode('scale');
+
+$('btn-strut').onclick = () => {
+  if (!requireEdit()) return;
+  const o = createStrut();
+  o.container.position.set((Math.random()-0.5)*2, 1.6, (Math.random()-0.5)*2);
+  selectObject(o);
+};
+$('btn-box').onclick = () => {
+  if (!requireEdit()) return;
+  const o = createBox();
+  o.container.position.set((Math.random()-0.5)*2, 0.5, (Math.random()-0.5)*2);
+  selectObject(o);
+};
+$('btn-anchor').onclick = () => {
+  if (!requireEdit()) return;
+  const o = createAnchor();
+  o.container.position.set(0, 3, 0);
+  selectObject(o);
+  toast('Anchor added — it stays fixed in space; hang cables from it');
+};
+$('btn-fbx').onclick = () => { if (requireEdit()) $('fbx-input').click(); };
+$('fbx-input').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (f) loadFBXFile(f);
+  e.target.value = '';
+});
+
+document.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => buildPreset(b.dataset.preset));
+document.querySelectorAll('[data-example]').forEach(b => b.onclick = () => loadExample(b.dataset.example));
+
+$('btn-save').onclick = () => {
+  if (!objects.size) return toast('Nothing to save yet', true);
+  download('tensegrity-scene.json', JSON.stringify(serializeScene(), null, 1));
+};
+$('btn-open').onclick = () => { if (requireEdit()) $('scene-input').click(); };
+$('scene-input').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  try{
+    await loadScene(JSON.parse(await f.text()));
+    toast(`Opened ${f.name}`);
+  }catch(err){
+    console.error(err);
+    toast(`Could not open scene: ${err.message || err}`, true);
+  }
+});
+$('btn-frame').onclick = frameAll;
+$('btn-clear').onclick = () => { clearScene(); toast('Scene cleared'); };
+
+const playBtn = $('btn-play');
+playBtn.onclick = () => {
+  if (simState === SIM.EDIT){
+    if (cables.size === 0) return toast('Add at least one cable first', true);
+    cancelPendingCable();
+    gizmo.detach();
+    buildWorld();
+    simState = SIM.RUNNING;
+    playBtn.textContent = 'Pause';
+    lastTime = performance.now();
+    accumulator = 0;
+  } else if (simState === SIM.RUNNING){
+    simState = SIM.PAUSED;
+    playBtn.textContent = 'Resume';
+  } else {
+    simState = SIM.RUNNING;
+    playBtn.textContent = 'Pause';
+    lastTime = performance.now();
+  }
+  updateHint();
+};
+$('btn-reset').onclick = () => { if (simState !== SIM.EDIT) stopSimulation(true); };
+
+const sliders = [
+  ['p-grav',  'o-grav',  'gravity',   v => v.toFixed(1)],
+  ['p-stiff', 'o-stiff', 'stiffness', v => v.toFixed(0)],
+  ['p-damp',  'o-damp',  'damping',   v => v.toFixed(1)],
+  ['p-pre',   'o-pre',   'prestress', v => v.toFixed(2)],
+  ['p-dens',  'o-dens',  'density',   v => v.toFixed(1)],
+];
+for (const [id, outId, key, fmt] of sliders){
+  const el = $(id), out = $(outId);
+  el.addEventListener('input', () => {
+    params[key] = parseFloat(el.value);
+    out.textContent = fmt(params[key]);
+    if (key === 'gravity' && world) world.gravity.set(0, -params.gravity, 0);
+    if (key === 'density' && world) objects.forEach(o => {
+      if (!o.body) return;
+      o.mass = Math.max(0.05, objectVolume(o, o.body.shapes[0].halfExtents) * params.density * MASS_SCALE);
+      setBodyMass(o);
+    });
+    if (key === 'stiffness' || key === 'density' || key === 'prestress') updateStepSize();
+  });
+}
+function syncSliders(){
+  for (const [id, outId, key, fmt] of sliders){
+    $(id).value = params[key];
+    $(outId).textContent = fmt(params[key]);
+  }
+  $('p-coll').checked = params.collisions;
+}
+$('p-coll').addEventListener('change', e => { params.collisions = e.target.checked; });
+
+$('btn-sheet').onclick = () => {
+  const collapsed = document.body.classList.toggle('sheet-collapsed');
+  $('btn-sheet').textContent = collapsed ? 'Show' : 'Hide';
+};
+
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === 'g') setGizmoMode('translate');
+  else if (k === 'r') setGizmoMode('rotate');
+  else if (k === 's') setGizmoMode('scale');
+  else if (k === 'f') frameAll();
+  else if (k === ' ' && e.target.tagName !== 'BUTTON'){ e.preventDefault(); playBtn.click(); }
+  else if (k === 'escape'){ cancelPendingCable(); deselect(); }
+  else if ((k === 'delete' || k === 'backspace') && selectedObj && simState === SIM.EDIT)
+    removeObject(selectedObj.id);
+});
+
+new ResizeObserver(resize).observe(wrap);
+
+/* ============================== main loop ============================== */
+
+let lastTime = performance.now(), accumulator = 0, statsTimer = 0;
+
+function stepSimulation(now){
+  const frameDt = Math.min((now - lastTime) / 1000, 1/20);
+  lastTime = now;
+  accumulator += frameDt;
+  let steps = Math.floor(accumulator / stepH);
+  simSpeed = 1;
+  if (steps > MAX_STEPS_PER_FRAME){
+    simSpeed = MAX_STEPS_PER_FRAME / steps;
+    steps = MAX_STEPS_PER_FRAME;
+    accumulator = 0;
+  } else accumulator -= steps * stepH;
+  for (let i = 0; i < steps; i++){
+    applyCableForces();
+    world.step(stepH);
+  }
+  syncMeshes();
+}
+
+function updateSimStats(now){
+  if (now - statsTimer < 250) return;
+  statsTimer = now;
+  let max = 0, taut = 0;
+  cables.forEach(c => { if (c.tension > 0){ taut++; max = Math.max(max, c.tension); } });
+  $('simstats').textContent =
+    `${taut}/${cables.size} taut · max ${max.toFixed(0)} N · Δt 1/${Math.round(1/stepH)} s` +
+    (simSpeed < 0.98 ? ` · ${(simSpeed*100).toFixed(0)}% speed` : '');
+}
+
+function animate(now){
+  requestAnimationFrame(animate);
+  orbit.update();
+  if (simState === SIM.RUNNING && world){
+    stepSimulation(now);
+    updateSimStats(now);
+  }
+  updateCableLines();
+  if (selBox) selBox.update();
+  renderer.render(scene, camera);
+}
+
+// advance the simulation synchronously by `seconds` of simulated time (starts it if needed)
+function simulateFor(seconds){
+  if (simState === SIM.EDIT) playBtn.click();
+  const n = Math.ceil(seconds / stepH);
+  for (let i = 0; i < n; i++){ applyCableForces(); world.step(stepH); }
+  syncMeshes();
+  updateCableLines();
+  statsTimer = 0;
+  updateSimStats(performance.now());
+  return n;
+}
+
+// console access for scripting and debugging, e.g. tensegrity.serializeScene()
+window.tensegrity = { scene, camera, renderer, orbit, objects, cables, params, buildPreset, buildGraph, prismGraph, loadScene, serializeScene, clearScene, simulateFor, PRESETS };
+
+resize();
+syncSliders();
+updateHint();
+refreshStats();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
